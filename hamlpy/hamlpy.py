@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 from nodes import RootNode, FilterNode, HamlNode, create_node
-from optparse import OptionParser
+import nodes as hamlpynodes
+import argparse
 import sys
-
-VALID_EXTENSIONS=['haml', 'hamlpy']
+import os
+import codecs
 
 class Compiler:
 
@@ -48,37 +49,68 @@ class Compiler:
         else:
             return root.render()
 
-def convert_files():
-    import sys
-    import codecs
+class StoreNameValueTagPair(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string = None):
+        tags = getattr(namespace, 'tags', {})
+        if tags is None:
+            tags = {}
+        for item in values:
+            n, v = item.split(':')
+            tags[n] = v
+        
+        setattr(namespace, 'tags', tags)
 
-    parser = OptionParser()
-    parser.add_option(
-        "-d", "--debug-tree", dest="debug_tree",
-        action="store_true",
-        help="Print the generated tree instead of the HTML")
-    parser.add_option(
-        "--attr-wrapper", dest="attr_wrapper",
-        type="choice", choices=('"', "'"), default="'",
-        action="store",
-        help="The character that should wrap element attributes. "
-        "This defaults to ' (an apostrophe).")
-    (options, args) = parser.parse_args()
-
-    if len(args) < 1:
-        print "Specify the input file as the first argument."
-    else:
-        infile = args[0]
-        haml_lines = codecs.open(infile, 'r', encoding='utf-8').read().splitlines()
-
-        compiler = Compiler(options.__dict__)
+def compile_file(fullpath, outfile_name, compiler_args):
+    """Calls HamlPy compiler."""
+    try:
+        haml_lines = codecs.open(fullpath, 'r', encoding = 'utf-8').read().splitlines()
+        compiler = Compiler(compiler_args)
         output = compiler.process_lines(haml_lines)
+        outfile = codecs.open(outfile_name, 'w', encoding = 'utf-8')
+        outfile.write(output)
+    except Exception, e:
+        # import traceback
+        print "Failed to compile %s -> %s\nReason:\n%s" % (fullpath, outfile_name, e)
+        # print traceback.print_exc()
 
-        if len(args) == 2:
-            outfile = codecs.open(args[1], 'w', encoding='utf-8')
-            outfile.write(output)
-        else:
-            print output
+def convert_files():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--debug-tree', help='Print the generated tree instead of the HTML', action='store_true')
+    parser.add_argument('--tag', help='Add self closing tag. eg. --tag macro:endmacro', type=str, nargs=1, action=StoreNameValueTagPair)
+    parser.add_argument('--attr-wrapper', dest='attr_wrapper', type=str, choices=('"', "'"), default="'", action='store', help="The character that should wrap element attributes. This defaults to ' (an apostrophe).")
+    parser.add_argument('--jinja', help='Makes the necessary changes to be used with Jinja2', default=False, action='store_true')
+    parser.add_argument('input_file', help='Input file', type=str)
+    parser.add_argument('output_file', help='Output file', type=str)
+    args = parser.parse_args()
+
+    input_file = os.path.realpath(args.input_file)
+    output_file = os.path.realpath(args.output_file)
+
+    compiler_args = {}
+
+    if getattr(args, 'tags', False):
+        hamlpynodes.TagNode.self_closing.update(args.tags)
+    
+    if args.attr_wrapper:
+        compiler_args['attr_wrapper'] = args.attr_wrapper
+    
+    if args.jinja:
+        for k in ('ifchanged', 'ifequal', 'ifnotequal', 'autoescape', 'blocktrans',
+                  'spaceless', 'comment', 'cache', 'localize', 'compress'):
+            del hamlpynodes.TagNode.self_closing[k]
+            
+            hamlpynodes.TagNode.may_contain.pop(k, None)
+        
+        hamlpynodes.TagNode.self_closing.update({
+            'macro'  : 'endmacro',
+            'call'   : 'endcall',
+        })
+        
+        hamlpynodes.TagNode.may_contain['for'] = 'else'
+
+    compile_file(input_file, output_file, compiler_args)
+
 
 if __name__ == '__main__':
     convert_files()

@@ -13,6 +13,8 @@ import time
 import hamlpy
 import nodes as hamlpynodes
 
+VALID_EXTENSIONS=['haml', 'hamlpy']
+
 try:
     str = unicode
 except NameError:
@@ -27,17 +29,6 @@ class Options(object):
 # dict of compiled files [fullpath : timestamp]
 compiled = dict()
 
-class StoreNameValueTagPair(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string = None):
-        tags = getattr(namespace, 'tags', {})
-        if tags is None:
-            tags = {}
-        for item in values:
-            n, v = item.split(':')
-            tags[n] = v
-        
-        setattr(namespace, 'tags', tags)
-
 arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('-v', '--verbose', help = 'Display verbose output', action = 'store_true')
 arg_parser.add_argument('-i', '--input-extension', metavar = 'EXT', default = '.hamlpy', help = 'The file extensions to look for', type = str, nargs = '+')
@@ -45,13 +36,13 @@ arg_parser.add_argument('-ext', '--extension', metavar = 'EXT', default = Option
 arg_parser.add_argument('-r', '--refresh', metavar = 'S', default = Options.CHECK_INTERVAL, help = 'Refresh interval for files. Default is {} seconds'.format(Options.CHECK_INTERVAL), type = int)
 arg_parser.add_argument('input_dir', help = 'Folder to watch', type = str)
 arg_parser.add_argument('output_dir', help = 'Destination folder', type = str, nargs = '?')
-arg_parser.add_argument('--tag', help = 'Add self closing tag. eg. --tag macro:endmacro', type = str, nargs = 1, action = StoreNameValueTagPair)
+arg_parser.add_argument('--tag', help = 'Add self closing tag. eg. --tag macro:endmacro', type = str, nargs = 1, action = hamlpy.StoreNameValueTagPair)
 arg_parser.add_argument('--attr-wrapper', dest = 'attr_wrapper', type = str, choices = ('"', "'"), default = "'", action = 'store', help = "The character that should wrap element attributes. This defaults to ' (an apostrophe).")
 arg_parser.add_argument('--jinja', help = 'Makes the necessary changes to be used with Jinja2', default = False, action = 'store_true')
 
 def watched_extension(extension):
     """Return True if the given extension is one of the watched extensions"""
-    for ext in hamlpy.VALID_EXTENSIONS:
+    for ext in VALID_EXTENSIONS:
         if extension.endswith('.' + ext):
             return True
     return False
@@ -79,7 +70,7 @@ def watch_folder():
         hamlpynodes.TagNode.self_closing.update(args.tags)
     
     if args.input_extension:
-        hamlpy.VALID_EXTENSIONS += args.input_extension
+        VALID_EXTENSIONS += args.input_extension
     
     if args.attr_wrapper:
         compiler_args['attr_wrapper'] = args.attr_wrapper
@@ -126,28 +117,11 @@ def _watch_folder(folder, destination, compiler_args):
                 if (not fullpath in compiled or
                     compiled[fullpath] < mtime or
                     not os.path.isfile(compiled_path)):
-                    compile_file(fullpath, compiled_path, compiler_args)
+                    hamlpy.compile_file(fullpath, compiled_path, compiler_args)
                     compiled[fullpath] = mtime
 
 def _compiled_path(destination, filename):
     return os.path.join(destination, filename[:filename.rfind('.')] + Options.OUTPUT_EXT)
-
-def compile_file(fullpath, outfile_name, compiler_args):
-    """Calls HamlPy compiler."""
-    if Options.VERBOSE:
-        print '%s %s -> %s' % (strftime("%H:%M:%S"), fullpath, outfile_name)
-    try:
-        if Options.DEBUG:
-            print "Compiling %s -> %s" % (fullpath, outfile_name)
-        haml_lines = codecs.open(fullpath, 'r', encoding = 'utf-8').read().splitlines()
-        compiler = hamlpy.Compiler(compiler_args)
-        output = compiler.process_lines(haml_lines)
-        outfile = codecs.open(outfile_name, 'w', encoding = 'utf-8')
-        outfile.write(output)
-    except Exception, e:
-        # import traceback
-        print "Failed to compile %s -> %s\nReason:\n%s" % (fullpath, outfile_name, e)
-        # print traceback.print_exc()
 
 if __name__ == '__main__':
     watch_folder()
