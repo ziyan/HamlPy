@@ -228,7 +228,7 @@ class HamlNode(RootNode):
         RootNode.__init__(self)
         self.haml = haml.strip()
         self.raw_haml = haml
-        self.indentation = 0 #(len(haml) - len(haml.lstrip()))
+        self.indentation = (len(haml) - len(haml.lstrip()))
         self.spaces = '' #''.join(haml[0] for i in range(self.indentation))
 
     def replace_inline_variables(self, content):
