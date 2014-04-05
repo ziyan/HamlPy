@@ -59,8 +59,8 @@ class Element(object):
         self.id = self._parse_id(split_tags.get('id'))
         self.classes = ('%s %s' % (split_tags.get('class').lstrip(self.CLASS).replace('.', ' '), self._parse_class_from_attributes_dict())).strip()
         self.self_close = split_tags.get('selfclose') or self.tag in self.self_closing_tags
-        self.nuke_inner_whitespace = split_tags.get('nuke_inner_whitespace') != ''
-        self.nuke_outer_whitespace = split_tags.get('nuke_outer_whitespace') != ''
+        self.nuke_inner_whitespace = True # split_tags.get('nuke_inner_whitespace') != ''
+        self.nuke_outer_whitespace = True # split_tags.get('nuke_outer_whitespace') != ''
         self.django_variable = split_tags.get('django') != ''
         self.inline_content = split_tags.get('inline').strip()
 

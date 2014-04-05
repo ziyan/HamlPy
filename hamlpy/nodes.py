@@ -163,7 +163,7 @@ class RootNode(TreeNode):
         return self._generate_html()
 
     def render_newlines(self):
-        return '\n' * (self.newlines + 1)
+        return '\n' * self.newlines
 
     def parent_of(self, node):
         if (self._should_go_inside_last_node(node)):
@@ -228,8 +228,8 @@ class HamlNode(RootNode):
         RootNode.__init__(self)
         self.haml = haml.strip()
         self.raw_haml = haml
-        self.indentation = (len(haml) - len(haml.lstrip()))
-        self.spaces = ''.join(haml[0] for i in range(self.indentation))
+        self.indentation = 0 #(len(haml) - len(haml.lstrip()))
+        self.spaces = '' #''.join(haml[0] for i in range(self.indentation))
 
     def replace_inline_variables(self, content):
         content = re.sub(INLINE_VARIABLE, r'{{ \2 }}', content)
@@ -249,9 +249,9 @@ class PlaintextNode(HamlNode):
 
         self.before = '%s%s' % (self.spaces, text)
         if self.children:
-            self.before += self.render_newlines()
+            self.before += self.render_newlines() + '\n'
         else:
-            self.after = self.render_newlines()
+            self.after = self.render_newlines() + '\n'
         self._render_children()
 
 class ElementNode(HamlNode):

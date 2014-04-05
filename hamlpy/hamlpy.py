@@ -5,6 +5,7 @@ import argparse
 import sys
 import os
 import codecs
+import re
 
 class Compiler:
 
@@ -60,12 +61,14 @@ class StoreNameValueTagPair(argparse.Action):
         
         setattr(namespace, 'tags', tags)
 
-def compile_file(fullpath, outfile_name, compiler_args):
+def compile_file(fullpath, outfile_name, compiler_args, is_compress=False):
     """Calls HamlPy compiler."""
     try:
         haml_lines = codecs.open(fullpath, 'r', encoding = 'utf-8').read().splitlines()
         compiler = Compiler(compiler_args)
         output = compiler.process_lines(haml_lines)
+        if is_compress:
+            output = re.sub(r'>\s+<', '><', output)
         outfile = codecs.open(outfile_name, 'w', encoding = 'utf-8')
         outfile.write(output)
     except Exception, e:
@@ -80,6 +83,7 @@ def convert_files():
     parser.add_argument('--tag', help='Add self closing tag. eg. --tag macro:endmacro', type=str, nargs=1, action=StoreNameValueTagPair)
     parser.add_argument('--attr-wrapper', dest='attr_wrapper', type=str, choices=('"', "'"), default="'", action='store', help="The character that should wrap element attributes. This defaults to ' (an apostrophe).")
     parser.add_argument('--jinja', help='Makes the necessary changes to be used with Jinja2', default=False, action='store_true')
+    parser.add_argument('--compress', help='Remove spaces', default=False, action='store_true')
     parser.add_argument('input_file', help='Input file', type=str)
     parser.add_argument('output_file', help='Output file', type=str)
     args = parser.parse_args()
@@ -109,7 +113,7 @@ def convert_files():
         
         hamlpynodes.TagNode.may_contain['for'] = 'else'
 
-    compile_file(input_file, output_file, compiler_args)
+    compile_file(input_file, output_file, compiler_args, is_compress=args.compress)
 
 
 if __name__ == '__main__':
